@@ -59,7 +59,7 @@ const ensurePseudocodeLoaded = (): Promise<void> => {
   });
 };
 
-const renderPseudo = async () => {
+const setupPseudocodeRendering = async () => {
   // Find all code blocks that Quartz labeled as 'pseudo'
   const codeBlocks = document.querySelectorAll('code[data-language="pseudo"]');
 
@@ -83,6 +83,7 @@ const renderPseudo = async () => {
       // Create a container for the rendered algorithm
       const container = document.createElement("div");
       container.classList.add("pseudocode-container");
+      container.classList.add("pseudocode-rendered");
 
       try {
         (
@@ -110,11 +111,20 @@ const renderPseudo = async () => {
   }
 };
 
-// 'nav' is a custom Quartz event that fires on every page load/transition
+// Set up event listeners for page navigation and DOM updates
+// 'nav' fires on every page load/transition
+// 'render' fires when DOM is updated in-place (popovers, decryption, dynamic content)
 if (typeof document !== "undefined") {
-  document.addEventListener("nav", renderPseudo);
-  // 'render' fires when the DOM is updated in-place (e.g., popovers, dynamic content)
-  document.addEventListener("render", renderPseudo);
+  document.addEventListener("nav", setupPseudocodeRendering);
+  document.addEventListener("render", setupPseudocodeRendering);
+
+  // Register cleanup on prenav to prevent memory leaks during SPA navigation
+  if (typeof window !== "undefined" && window.addCleanup) {
+    window.addCleanup(() => {
+      document.removeEventListener("nav", setupPseudocodeRendering);
+      document.removeEventListener("render", setupPseudocodeRendering);
+    });
+  }
 }
 
 // Export as default for module compatibility during build
