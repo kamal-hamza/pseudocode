@@ -1,7 +1,5 @@
-// Re-export and consolidate types from the plugin
-export type { PseudoOptions } from "./components/Pseudo";
+export type { PseudoOptions } from "./transformers/Pseudocode";
 
-// Re-export types from @quartz-community/types
 export type {
   QuartzComponent,
   QuartzComponentProps,

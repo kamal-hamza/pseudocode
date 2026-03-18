@@ -32,10 +32,6 @@
       "types": "./dist/types.d.ts",
       "import": "./dist/types.js"
     },
-    "./components": {
-      "types": "./dist/components/index.d.ts",
-      "import": "./dist/components/index.js"
-    },
     "./package.json": "./package.json"
   },
   "main": "./dist/index.js",
@@ -97,7 +93,7 @@
   },
   "quartz": {
     "category": [
-      "component"
+      "transformer"
     ],
     "defaultOptions": {}
   },

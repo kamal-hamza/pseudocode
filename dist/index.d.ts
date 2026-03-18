@@ -1,6 +1,12 @@
-export { Pseudo, PseudoOptions } from './components/index.js';
+import { QuartzTransformerPlugin } from '@quartz-community/types';
 export { PageGenerator, PageMatcher, QuartzComponent, QuartzComponentConstructor, QuartzComponentProps, QuartzEmitterPlugin, QuartzFilterPlugin, QuartzPageTypePlugin, QuartzPageTypePluginInstance, QuartzTransformerPlugin, StringResource, VirtualPage } from '@quartz-community/types';
 
-declare function init(options?: Record<string, unknown>): void;
+interface PseudoOptions {
+    indentSize?: string;
+    lineNumber?: boolean;
+    lineNumberPunc?: string;
+    noEnd?: boolean;
+}
+declare const Pseudocode: QuartzTransformerPlugin<PseudoOptions>;
 
-export { init };
+export { type PseudoOptions, Pseudocode };
