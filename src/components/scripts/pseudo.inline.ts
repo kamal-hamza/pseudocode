@@ -79,9 +79,10 @@ const setupPseudocodeRendering = async () => {
       content = block.textContent || "";
     }
 
-    const preTag = block.closest("pre") || block.parentElement;
+    // FIX: Look for the <figure> wrapper first to prevent leftover styling boxes
+    const targetNode = block.closest("figure") || block.closest("pre") || block.parentElement;
 
-    if (preTag && content && !preTag.classList.contains("pseudocode-rendered")) {
+    if (targetNode && content && !targetNode.classList.contains("pseudocode-rendered")) {
       const container = document.createElement("div");
       container.classList.add("pseudocode-container");
 
@@ -100,26 +101,21 @@ const setupPseudocodeRendering = async () => {
         });
 
         container.classList.add("pseudocode-rendered");
-        preTag.replaceWith(container);
+        targetNode.replaceWith(container);
       } catch (e) {
         console.error("Pseudocode.js failed to render:", e);
-        preTag.classList.add("pseudocode-rendered", "pseudocode-error");
+        targetNode.classList.add("pseudocode-rendered", "pseudocode-error");
       }
     }
   }
 };
 
+// Execute immediately for direct page loads where 'nav' event already fired
 if (typeof document !== "undefined") {
+  setupPseudocodeRendering();
+  // Keep the listeners, but REMOVED the window.addCleanup block so it works in SPAs
   document.addEventListener("nav", setupPseudocodeRendering);
   document.addEventListener("render", setupPseudocodeRendering);
-
-  // Register cleanup on prenav to prevent memory leaks during SPA navigation
-  if (typeof window !== "undefined" && window.addCleanup) {
-    window.addCleanup(() => {
-      document.removeEventListener("nav", setupPseudocodeRendering);
-      document.removeEventListener("render", setupPseudocodeRendering);
-    });
-  }
 }
 
 export default "" as unknown;
