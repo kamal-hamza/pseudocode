@@ -4,6 +4,7 @@ import type {
   QuartzComponentConstructor,
 } from "@quartz-community/types";
 import style from "./styles/pseudo.scss";
+// @ts-expect-error inline script import handled by esbuild plugin
 import script from "./scripts/pseudo.inline.ts";
 
 export interface PseudoOptions {

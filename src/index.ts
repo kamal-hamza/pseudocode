@@ -1,15 +1,11 @@
-import Pseudo from "./components/Pseudo";
-import type { PseudoOptions } from "./components/Pseudo";
-
-export default Pseudo;
-export { Pseudo };
-export type { PseudoOptions };
+export { default as Pseudo } from "./components/Pseudo";
+export type { PseudoOptions } from "./components/Pseudo";
 
 // Export the init function so YAML users can configure it in quartz.config.yaml
 export function init(options?: Record<string, unknown>): void {
   // If you add features to PseudoOptions later,
   // you can capture and process them here.
-  const _myOpts = options as PseudoOptions | undefined;
+  const _myOpts = options as Record<string, unknown> | undefined;
 }
 
 // Re-export shared types from @quartz-community/types

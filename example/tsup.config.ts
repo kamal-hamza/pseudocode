@@ -21,11 +21,15 @@ const inlineScriptPlugin: Plugin = {
   setup(parentBuild) {
     const absWorkingDir = parentBuild.initialOptions.absWorkingDir ?? process.cwd();
 
-    // SCSS files are compiled to CSS via sass, matching Quartz v5 core behavior
+    // SCSS files are compiled to CSS via the sass package, then embedded as text.
+    // This mirrors Quartz v5 core's sassPlugin({ type: "css-text" }) behavior.
     parentBuild.onLoad({ filter: /\.scss$/ }, async (args) => {
       const sass = await import("sass");
       const result = sass.compile(args.path);
-      return { contents: result.css, loader: "text" };
+      return {
+        contents: result.css,
+        loader: "text",
+      };
     });
 
     // Inline TypeScript files are transpiled + bundled for the browser
@@ -75,6 +79,8 @@ export default defineConfig({
   entry: {
     index: "src/index.ts",
     types: "src/types.ts",
+    registry: "src/registry.ts",
+    "compiler/index": "src/compiler/index.ts",
     "components/index": "src/components/index.ts",
   },
   format: ["esm"],

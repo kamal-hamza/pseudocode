@@ -1,0 +1,516 @@
+import type { EvalContext } from "./interpreter";
+
+export type GlobalFunction = (args: unknown[], context: EvalContext) => unknown;
+export type MethodFunction = (target: unknown, args: unknown[], context: EvalContext) => unknown;
+export type MethodTarget = "string" | "number" | "date" | "list" | "file";
+
+export const globalFunctions = new Map<string, GlobalFunction>();
+export const methodFunctions = new Map<MethodTarget, Map<string, MethodFunction>>();
+
+export function getGlobalFunction(name: string): GlobalFunction | undefined {
+  return globalFunctions.get(name);
+}
+
+export function getMethodFunction(name: string, target: unknown): MethodFunction | undefined {
+  const category = getMethodTarget(target);
+  if (!category) return undefined;
+  return methodFunctions.get(category)?.get(name);
+}
+
+function registerGlobalFunction(name: string, fn: GlobalFunction): void {
+  globalFunctions.set(name, fn);
+}
+
+function registerMethodFunction(target: MethodTarget, name: string, fn: MethodFunction): void {
+  const group = methodFunctions.get(target) ?? new Map<string, MethodFunction>();
+  group.set(name, fn);
+  methodFunctions.set(target, group);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function toStringValue(value: unknown): string {
+  if (value === undefined || value === null) return "";
+  return String(value);
+}
+
+function toNumber(value: unknown): number | null {
+  if (typeof value === "number" && !Number.isNaN(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  if (typeof value === "boolean") return value ? 1 : 0;
+  return null;
+}
+
+function toInteger(value: unknown, fallback: number): number {
+  const numberValue = toNumber(value);
+  if (numberValue === null) return fallback;
+  return Math.trunc(numberValue);
+}
+
+function roundTo(value: number, decimals: number): number {
+  const factor = 10 ** decimals;
+  return Math.round(value * factor) / factor;
+}
+
+function flattenArgs(args: unknown[]): unknown[] {
+  if (args.length === 1 && Array.isArray(args[0])) return args[0];
+  return args;
+}
+
+function collectNumericArgs(args: unknown[]): number[] {
+  const values = flattenArgs(args);
+  const numbers: number[] = [];
+  for (const value of values) {
+    const numberValue = toNumber(value);
+    if (numberValue !== null) numbers.push(numberValue);
+  }
+  return numbers;
+}
+
+function isFileValue(value: unknown): value is EvalContext["file"] {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.name === "string" &&
+    typeof value.path === "string" &&
+    typeof value.folder === "string" &&
+    typeof value.ext === "string" &&
+    Array.isArray(value.tags) &&
+    Array.isArray(value.links)
+  );
+}
+
+function isDateValue(value: unknown): value is Date {
+  return value instanceof Date;
+}
+
+function isAlpha(ch: string): boolean {
+  if (!ch) return false;
+  const code = ch.charCodeAt(0);
+  return (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
+}
+
+function isDigit(ch: string): boolean {
+  if (!ch) return false;
+  const code = ch.charCodeAt(0);
+  return code >= 48 && code <= 57;
+}
+
+function parseDuration(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+
+  const multipliers: Record<string, number> = {
+    ms: 1,
+    s: 1000,
+    m: 60_000,
+    h: 3_600_000,
+    d: 86_400_000,
+    w: 604_800_000,
+    mo: 2_592_000_000,
+    y: 31_536_000_000,
+  };
+
+  let index = 0;
+  let total = 0;
+
+  while (index < trimmed.length) {
+    while (trimmed[index] === " " || trimmed[index] === "\t") {
+      index += 1;
+    }
+    if (index >= trimmed.length) break;
+
+    const start = index;
+    let hasDot = false;
+    while (index < trimmed.length) {
+      const ch = trimmed[index] ?? "";
+      if (isDigit(ch)) {
+        index += 1;
+        continue;
+      }
+      if (ch === "." && !hasDot) {
+        hasDot = true;
+        index += 1;
+        continue;
+      }
+      break;
+    }
+
+    if (start === index) return undefined;
+    const amount = Number(trimmed.slice(start, index));
+    if (Number.isNaN(amount)) return undefined;
+
+    const unitStart = index;
+    while (index < trimmed.length && isAlpha(trimmed[index] ?? "")) {
+      index += 1;
+    }
+    const unit = trimmed.slice(unitStart, index).toLowerCase();
+    const multiplier = unit ? multipliers[unit] : 1;
+    if (unit && multiplier === undefined) return undefined;
+
+    total += amount * (multiplier ?? 1);
+  }
+
+  return total;
+}
+
+function parseDate(value: unknown): Date | undefined {
+  if (value instanceof Date) return value;
+  if (typeof value === "number") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? undefined : date;
+  }
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    if (Number.isNaN(parsed)) return undefined;
+    return new Date(parsed);
+  }
+  return undefined;
+}
+
+function resolveContextPath(path: string, context: EvalContext): unknown {
+  const trimmed = path.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.startsWith("note.")) {
+    return getNestedValue(context.note, trimmed.slice(5).split("."));
+  }
+  if (trimmed.startsWith("file.")) {
+    return getNestedValue(context.file, trimmed.slice(5).split("."));
+  }
+  if (trimmed.startsWith("formula.")) {
+    return getNestedValue(context.formula, trimmed.slice(8).split("."));
+  }
+  return getNestedValue(context.note, trimmed.split("."));
+}
+
+function getNestedValue(target: unknown, path: string[]): unknown {
+  let current: unknown = target;
+  for (const part of path) {
+    if (!part) continue;
+    if (Array.isArray(current)) {
+      const index = Number(part);
+      if (Number.isNaN(index)) return undefined;
+      current = current[index];
+      continue;
+    }
+    if (!isRecord(current)) return undefined;
+    current = current[part];
+  }
+  return current;
+}
+
+function buildFileValue(path: string): EvalContext["file"] {
+  const normalized = path.trim();
+  const lastSlash = normalized.lastIndexOf("/");
+  const fileName = lastSlash >= 0 ? normalized.slice(lastSlash + 1) : normalized;
+  const lastDot = fileName.lastIndexOf(".");
+  const name = lastDot > 0 ? fileName.slice(0, lastDot) : fileName;
+  const ext = lastDot > 0 ? fileName.slice(lastDot + 1) : "";
+  const folder = lastSlash >= 0 ? normalized.slice(0, lastSlash) : "";
+
+  return {
+    name: name || fileName || normalized,
+    path: normalized,
+    folder,
+    ext,
+    tags: [],
+    links: [],
+  };
+}
+
+function getMethodTarget(value: unknown): MethodTarget | undefined {
+  if (typeof value === "string") return "string";
+  if (typeof value === "number" && !Number.isNaN(value)) return "number";
+  if (isDateValue(value)) return "date";
+  if (Array.isArray(value)) return "list";
+  if (isFileValue(value)) return "file";
+  return undefined;
+}
+
+registerGlobalFunction("if", ([cond, whenTrue, whenFalse]) => {
+  return cond ? whenTrue : whenFalse;
+});
+
+registerGlobalFunction("contains", ([haystack, needle]) => {
+  if (Array.isArray(haystack)) return haystack.includes(needle);
+  if (typeof haystack === "string") return haystack.includes(toStringValue(needle));
+  return false;
+});
+
+registerGlobalFunction("date", ([value]) => parseDate(value));
+
+registerGlobalFunction("duration", ([value]) => {
+  if (typeof value === "number") return value;
+  if (typeof value === "string") return parseDuration(value);
+  return undefined;
+});
+
+registerGlobalFunction("now", () => new Date());
+
+registerGlobalFunction("today", () => {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+});
+
+registerGlobalFunction("number", ([value]) => {
+  const numberValue = toNumber(value);
+  return numberValue === null ? undefined : numberValue;
+});
+
+registerGlobalFunction("min", (args) => {
+  const numbers = collectNumericArgs(args);
+  if (numbers.length === 0) return undefined;
+  return Math.min(...numbers);
+});
+
+registerGlobalFunction("max", (args) => {
+  const numbers = collectNumericArgs(args);
+  if (numbers.length === 0) return undefined;
+  return Math.max(...numbers);
+});
+
+registerGlobalFunction("list", ([value]) => {
+  if (value === undefined || value === null) return [];
+  if (Array.isArray(value)) return value;
+  return [value];
+});
+
+registerGlobalFunction("link", ([path, display]) => {
+  const target = toStringValue(path);
+  if (!target) return "";
+  const label = toStringValue(display);
+  return label ? `[[${target}|${label}]]` : `[[${target}]]`;
+});
+
+registerGlobalFunction("image", ([path]) => {
+  const target = toStringValue(path);
+  if (!target) return "";
+  return `![[${target}]]`;
+});
+
+registerGlobalFunction("icon", ([name]) => {
+  const value = toStringValue(name);
+  if (!value) return "";
+  return `:${value}:`;
+});
+
+registerGlobalFunction("html", ([value]) => toStringValue(value));
+
+registerGlobalFunction("escapeHTML", ([value]) => {
+  const text = toStringValue(value);
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+});
+
+registerGlobalFunction("file", ([path]) => {
+  if (typeof path !== "string") return undefined;
+  if (!path.trim()) return undefined;
+  return buildFileValue(path);
+});
+
+registerMethodFunction("file", "hasTag", (target, [tag]) => {
+  if (!isFileValue(target)) return false;
+  const value = toStringValue(tag);
+  if (!value) return false;
+  return target.tags.includes(value);
+});
+
+registerMethodFunction("file", "hasLink", (target, [link]) => {
+  if (!isFileValue(target)) return false;
+  const value = toStringValue(link);
+  if (!value) return false;
+  return target.links.includes(value);
+});
+
+registerMethodFunction("file", "inFolder", (target, [folder]) => {
+  if (!isFileValue(target)) return false;
+  const value = toStringValue(folder);
+  if (!value) return false;
+  const normalized = value.endsWith("/") ? value.slice(0, -1) : value;
+  return target.folder === normalized || target.folder.startsWith(`${normalized}/`);
+});
+
+registerMethodFunction("file", "hasProperty", (_target, [prop], context) => {
+  const value = toStringValue(prop);
+  if (!value) return false;
+  const resolved = resolveContextPath(value, context);
+  return resolved !== undefined && resolved !== null;
+});
+
+registerMethodFunction("string", "contains", (target, [needle]) => {
+  const value = toStringValue(target);
+  return value.includes(toStringValue(needle));
+});
+
+registerMethodFunction("string", "startsWith", (target, [prefix]) => {
+  const value = toStringValue(target);
+  return value.startsWith(toStringValue(prefix));
+});
+
+registerMethodFunction("string", "endsWith", (target, [suffix]) => {
+  const value = toStringValue(target);
+  return value.endsWith(toStringValue(suffix));
+});
+
+registerMethodFunction("string", "lower", (target) => toStringValue(target).toLowerCase());
+
+registerMethodFunction("string", "upper", (target) => toStringValue(target).toUpperCase());
+
+registerMethodFunction("string", "trim", (target) => toStringValue(target).trim());
+
+registerMethodFunction("string", "replace", (target, [search, replacement]) => {
+  const source = toStringValue(target);
+  const needle = toStringValue(search);
+  if (!needle) return source;
+  const replacementText = toStringValue(replacement);
+  return source.split(needle).join(replacementText);
+});
+
+registerMethodFunction("string", "slice", (target, [start, end]) => {
+  const source = toStringValue(target);
+  const startIndex = toInteger(start, 0);
+  if (end === undefined) return source.slice(startIndex);
+  const endIndex = toInteger(end, source.length);
+  return source.slice(startIndex, endIndex);
+});
+
+registerMethodFunction("string", "isEmpty", (target) => toStringValue(target).length === 0);
+
+registerMethodFunction("string", "repeat", (target, [count]) => {
+  const source = toStringValue(target);
+  const times = toInteger(count, 0);
+  if (times <= 0) return "";
+  return source.repeat(times);
+});
+
+registerMethodFunction("string", "reverse", (target) =>
+  toStringValue(target).split("").reverse().join(""),
+);
+
+registerMethodFunction("number", "toFixed", (target, [digits]) => {
+  const value = toNumber(target);
+  if (value === null) return undefined;
+  const decimals = toInteger(digits, 0);
+  return value.toFixed(decimals);
+});
+
+registerMethodFunction("number", "round", (target) => {
+  const value = toNumber(target);
+  if (value === null) return undefined;
+  return Math.round(value);
+});
+
+registerMethodFunction("number", "floor", (target) => {
+  const value = toNumber(target);
+  if (value === null) return undefined;
+  return Math.floor(value);
+});
+
+registerMethodFunction("number", "ceil", (target) => {
+  const value = toNumber(target);
+  if (value === null) return undefined;
+  return Math.ceil(value);
+});
+
+registerMethodFunction("number", "abs", (target) => {
+  const value = toNumber(target);
+  if (value === null) return undefined;
+  return Math.abs(value);
+});
+
+registerMethodFunction("date", "format", (target, [format]) => {
+  if (!isDateValue(target)) return undefined;
+  const timestamp = target.getTime();
+  if (Number.isNaN(timestamp)) return "";
+  if (typeof format === "string" && format) {
+    return target.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  }
+  return target.toISOString();
+});
+
+registerMethodFunction("date", "year", (target) =>
+  isDateValue(target) ? target.getFullYear() : undefined,
+);
+
+registerMethodFunction("date", "month", (target) =>
+  isDateValue(target) ? target.getMonth() + 1 : undefined,
+);
+
+registerMethodFunction("date", "day", (target) =>
+  isDateValue(target) ? target.getDate() : undefined,
+);
+
+registerMethodFunction("date", "time", (target) =>
+  isDateValue(target) ? target.getTime() : undefined,
+);
+
+registerMethodFunction("date", "relative", (target) => {
+  if (!isDateValue(target)) return undefined;
+  const time = target.getTime();
+  if (Number.isNaN(time)) return "";
+  const diff = time - Date.now();
+  const abs = Math.abs(diff);
+  const minutes = Math.round(abs / 60_000);
+  const hours = Math.round(abs / 3_600_000);
+  const days = Math.round(abs / 86_400_000);
+
+  if (days >= 1) return diff < 0 ? `${days}d ago` : `in ${days}d`;
+  if (hours >= 1) return diff < 0 ? `${hours}h ago` : `in ${hours}h`;
+  if (minutes >= 1) return diff < 0 ? `${minutes}m ago` : `in ${minutes}m`;
+  return diff < 0 ? "just now" : "soon";
+});
+
+registerMethodFunction("date", "isEmpty", (target) => {
+  if (!isDateValue(target)) return true;
+  return Number.isNaN(target.getTime());
+});
+
+registerMethodFunction("list", "sum", (target) => {
+  if (!Array.isArray(target)) return undefined;
+  return target.reduce((total, item) => {
+    const value = toNumber(item);
+    return value === null ? total : total + value;
+  }, 0);
+});
+
+registerMethodFunction("list", "mean", (target) => {
+  if (!Array.isArray(target)) return undefined;
+  const numbers = collectNumericArgs(target);
+  if (numbers.length === 0) return undefined;
+  const sum = numbers.reduce((total, value) => total + value, 0);
+  return sum / numbers.length;
+});
+
+registerMethodFunction("list", "count", (target) => (Array.isArray(target) ? target.length : 0));
+
+registerMethodFunction("list", "min", (target) => {
+  if (!Array.isArray(target)) return undefined;
+  const numbers = collectNumericArgs(target);
+  if (numbers.length === 0) return undefined;
+  return Math.min(...numbers);
+});
+
+registerMethodFunction("list", "max", (target) => {
+  if (!Array.isArray(target)) return undefined;
+  const numbers = collectNumericArgs(target);
+  if (numbers.length === 0) return undefined;
+  return Math.max(...numbers);
+});
+
+registerMethodFunction("list", "round", (target, [digits]) => {
+  if (!Array.isArray(target)) return undefined;
+  const decimals = toInteger(digits, 0);
+  return target.map((item) => {
+    const numberValue = toNumber(item);
+    if (numberValue === null) return item;
+    return roundTo(numberValue, decimals);
+  });
+});

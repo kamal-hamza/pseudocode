@@ -12,7 +12,7 @@
   },
   "plugins": ["@typescript-eslint"],
   "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended", "prettier"],
-  "ignorePatterns": ["dist", "node_modules", "example"],
+  "ignorePatterns": ["dist", "node_modules"],
   "rules": {
     "@typescript-eslint/no-unused-vars": [
       "error",
@@ -24,6 +24,12 @@
     ]
   },
   "overrides": [
+    {
+      "files": ["**/*.inline.ts"],
+      "rules": {
+        "@typescript-eslint/ban-ts-comment": "off"
+      }
+    },
     {
       "files": ["types/**/*.d.ts"],
       "rules": {

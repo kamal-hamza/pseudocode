@@ -1,0 +1,67 @@
+import type { ViewRenderer, ViewTypeRegistration } from "../../types";
+import { i18n } from "../../i18n";
+import { resolveEntryPropertyValue } from "../shared/cell";
+import { resolveRelative } from "../../util/path";
+
+function formatMessage(template: string, values: Record<string, string | number>): string {
+  return Object.entries(values).reduce(
+    (text, [key, value]) => text.replace(`{${key}}`, String(value)),
+    template,
+  );
+}
+
+const GalleryView: ViewRenderer = ({ entries, view, total, locale, slug }) => {
+  const imageProperty = typeof view.image === "string" ? view.image : undefined;
+  const localeStrings = i18n(locale).components.bases;
+  const columns =
+    typeof view.cardSize === "number" && view.cardSize > 0 ? Math.round(view.cardSize) : 3;
+  const gridStyle = { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` };
+
+  return (
+    <div class="bases-gallery-wrapper">
+      <div class="bases-view-meta">
+        {formatMessage(localeStrings.showingCount, {
+          count: entries.length,
+          total,
+        })}
+      </div>
+      <div class="bases-gallery" style={gridStyle}>
+        {entries.map((entry) => {
+          const imageValue = imageProperty
+            ? resolveEntryPropertyValue(imageProperty, entry)
+            : undefined;
+          const imageSrc = imageValue ? String(imageValue) : "";
+          return (
+            <div class="bases-gallery-item">
+              <div class="bases-gallery-image">
+                {imageSrc ? (
+                  <img src={imageSrc} alt={entry.title} loading="lazy" />
+                ) : (
+                  <span
+                    class="bases-gallery-placeholder"
+                    role="img"
+                    aria-label={localeStrings.noImage}
+                  />
+                )}
+              </div>
+              <div class="bases-gallery-title">
+                <a href={resolveRelative(slug, entry.slug)} class="internal" data-slug={entry.slug}>
+                  {entry.title}
+                </a>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+export const galleryViewRegistration: ViewTypeRegistration = {
+  id: "gallery",
+  name: "Gallery",
+  icon: "image",
+  render: GalleryView,
+};
+
+export { GalleryView };
