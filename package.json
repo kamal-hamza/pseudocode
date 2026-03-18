@@ -8,7 +8,7 @@
   "homepage": "https://quartz.jzhao.xyz",
   "repository": {
     "type": "git",
-    "url": "https://github.com/quartz-community/plugin-template"
+    "url": "git+https://github.com/quartz-community/plugin-template.git"
   },
   "keywords": [
     "quartz",
