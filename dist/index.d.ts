@@ -9,4 +9,4 @@ interface PseudoOptions {
 }
 declare const Pseudocode: QuartzTransformerPlugin<PseudoOptions>;
 
-export { type PseudoOptions, Pseudocode };
+export { type PseudoOptions, Pseudocode, Pseudocode as default };

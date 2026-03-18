@@ -47,7 +47,11 @@ var Pseudocode = (userOpts) => {
     }
   };
 };
+
+// src/index.ts
+var index_default = Pseudocode;
 export {
-  Pseudocode
+  Pseudocode,
+  index_default as default
 };
 //# sourceMappingURL=index.js.map
