@@ -1,23 +1,21 @@
 {
-  "name": "@quartz-community/plugin-template",
+  "name": "@kamal-hamza/quartz-plugin-pseudo",
   "version": "0.2.0",
-  "description": "Template repository for Quartz community plugins.",
+  "description": "Pseudocode component plugin for Quartz v5 with KaTeX support.",
   "type": "module",
   "license": "MIT",
-  "author": "Quartz Community",
-  "homepage": "https://quartz.jzhao.xyz",
+  "author": "Kamal Hamza",
+  "homepage": "https://github.com/kamal-hamza/quartz-plugin-pseudo",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/quartz-community/plugin-template.git"
+    "url": "git+https://github.com/kamal-hamza/quartz-plugin-pseudo.git"
   },
   "keywords": [
     "quartz",
     "quartz-plugin",
-    "plugin-template",
-    "remark",
-    "rehype",
-    "mdast",
-    "hast"
+    "pseudocode",
+    "component",
+    "plugin"
   ],
   "files": [
     "dist",
