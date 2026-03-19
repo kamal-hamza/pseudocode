@@ -1,18 +1,18 @@
 import type { QuartzTransformerPlugin } from "@quartz-community/types";
-// @ts-ignore
+// @ts-expect-error: handled by tsup loader
 import style from "./styles/pseudo.scss?inline";
 import script from "./scripts/pseudo.inline.ts";
 
 // Import CSS as strings (handled by tsup loader and Vitest ?raw)
-// @ts-ignore
+// @ts-expect-error: handled by tsup loader
 import katexCss from "katex/dist/katex.min.css?raw";
-// @ts-ignore
+// @ts-expect-error: handled by tsup loader
 import pseudocodeCss from "pseudocode/build/pseudocode.min.css?raw";
 
 // Import JS as raw strings (handled by tsup loader with ?raw)
-// @ts-ignore
+// @ts-expect-error: handled by tsup loader
 import katexJs from "katex/dist/katex.min.js?raw";
-// @ts-ignore
+// @ts-expect-error: handled by tsup loader
 import pseudocodeJs from "pseudocode/build/pseudocode.min.js?raw";
 
 export interface PseudoOptions {

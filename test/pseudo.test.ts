@@ -34,7 +34,7 @@ describe("Pseudocode Transformer", () => {
     const inlineScript = resources!.js![0];
 
     expect(typeof inlineScript).not.toBe("string");
-    if (typeof inlineScript !== "string") {
+    if (inlineScript && typeof inlineScript !== "string") {
       expect(inlineScript.contentType).toBe("inline");
       expect(inlineScript.loadTime).toBe("afterDOMReady");
       expect("script" in inlineScript).toBe(true);
