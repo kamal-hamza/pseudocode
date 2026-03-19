@@ -32,18 +32,6 @@ const quartzInlineLoader = (): esbuild.Plugin => ({
   },
 });
 
-// export default defineConfig({
-//   entry: {
-//     index: "src/index.ts",
-//     },
-//     outDir: "dist",
-//   format: ["esm", "cjs"],
-//   dts: true,
-//   sourcemap: true,
-//   clean: true,
-//   esbuildPlugins: [quartzInlineLoader()],
-// });
-
 export default defineConfig({
   entry: {
     index: "src/index.ts",
