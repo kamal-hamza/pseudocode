@@ -1,6 +1,6 @@
 {
   "name": "@kamal-hamza/quartz-plugin-pseudo",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Pseudocode component plugin for Quartz v5 with KaTeX support.",
   "type": "module",
   "license": "MIT",
