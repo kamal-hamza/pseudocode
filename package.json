@@ -93,10 +93,14 @@
     "vitest": "^2.1.9"
   },
   "quartz": {
-    "category": [
-      "transformer"
-    ],
-    "defaultOptions": {}
+    "name": "pseudocode",
+    "displayName": "Pseudocode",
+    "category": "transformer",
+    "defaultEnabled": true,
+    "defaultOptions": {
+      "lineNumber": true,
+      "indentSize": "1.2em"
+    }
   },
   "engines": {
     "node": ">=22",
